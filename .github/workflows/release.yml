@@ -5,13 +5,15 @@
 # 2. VERSION has to equal the tag without its "v"; a mismatch means the tag
 #    sits on the wrong commit.
 # 3. The notes are the tag's CHANGELOG.md section (tools/changelog-section.py);
-#    a tag without a section fails here.  A release that already exists keeps
-#    its notes; the artifacts are attached either way.
+#    a tag without a section fails here.  A tag with a "-" (1.1.0-rc1) is a
+#    prerelease.  A release that already exists is re-uploaded only when it
+#    is a prerelease, and keeps its notes; a published release is never
+#    replaced -- that would move a released version.
 # 4. The Homebrew formula: homebrew/maclib370.rb.in rendered with the version
 #    and the tarball's sha256 from the release's own SHA256SUMS, pushed to
 #    mvslovers/homebrew-tap.  Only a v* tag reaches the `release` environment
 #    that holds the tap's deploy key (HOMEBREW_TAP_DEPLOY_KEY).  An unchanged
-#    formula is not committed.
+#    formula is not committed, and a prerelease never reaches the tap.
 
 name: Release
 
@@ -69,16 +71,23 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            echo "Release $GITHUB_REF_NAME exists; its notes are left as they are."
+          if pre=$(gh release view "$GITHUB_REF_NAME" --json isPrerelease \
+                     -q .isPrerelease 2>/dev/null); then
+            if [ "$pre" != true ]; then
+              echo "::error::$GITHUB_REF_NAME is released; its assets are not replaced"
+              exit 1
+            fi
+            echo "Prerelease $GITHUB_REF_NAME exists; its notes are left as they are."
           else
-            gh release create "$GITHUB_REF_NAME" \
+            case $GITHUB_REF_NAME in *-*) p=--prerelease ;; *) p= ;; esac
+            gh release create "$GITHUB_REF_NAME" $p \
               --title "maclib370 $GITHUB_REF_NAME" --notes-file notes.md
           fi
           gh release upload "$GITHUB_REF_NAME" --clobber dist/*
 
   homebrew:
     needs: [version, release]
+    if: ${{ !contains(github.ref_name, '-') }}
     runs-on: ubuntu-latest
     environment: release
     steps:
