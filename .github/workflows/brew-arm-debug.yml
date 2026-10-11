@@ -11,8 +11,8 @@ jobs:
       fail-fast: false
       matrix:
         runner: [ubuntu-24.04-arm]
-        mode: [plain, verbose]
-        attempt: [1, 2, 3, 4, 5]
+        mode: [verbose-notoken, verbose-token]
+        attempt: [1, 2, 3, 4, 5, 6]
     runs-on: ${{ matrix.runner }}
     env:
       HOMEBREW_NO_AUTO_UPDATE: 1
@@ -23,9 +23,11 @@ jobs:
         run: |
           brew tap mvslovers/tap
           brew trust mvslovers/tap
-          if [ "${{ matrix.mode }}" = verbose ]; then
-            HOMEBREW_DEBUG=1 brew install --verbose --debug mvslovers/tap/cc370
-          else
-            brew install mvslovers/tap/cc370
+          if [ "${{ matrix.mode }}" = verbose-token ]; then
+            export HOMEBREW_GITHUB_API_TOKEN="${{ github.token }}"
           fi
+          HOMEBREW_DEBUG=1 brew install --verbose --debug mvslovers/tap/cc370 2>&1 | tee install.log
+          rc=${PIPESTATUS[0]}
+          echo "credential lookups: $(grep -c -E 'gh auth token|git credential' install.log)"
+          exit $rc
           brew list --versions cc370 libc370 maclib370
