@@ -1,0 +1,36 @@
+# Temporary: why does `brew install` of maclib370 end in "Broken pipe" on
+# ubuntu-24.04-arm (cc370 homebrew-check)? Not to be merged.
+name: brew arm debug
+on:
+  pull_request:
+    paths: ['.github/workflows/brew-arm-debug.yml']
+jobs:
+  debug:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04-arm, ubuntu-latest]
+        attempt: [1, 2, 3]
+    runs-on: ${{ matrix.runner }}
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: 1
+      HOMEBREW_NO_INSTALL_CLEANUP: 1
+    steps:
+      - run: echo /home/linuxbrew/.linuxbrew/bin >> "$GITHUB_PATH"
+      - name: brew config
+        run: brew config; ulimit -a; uname -a
+      - name: tap
+        run: brew tap mvslovers/tap && brew trust mvslovers/tap
+      - name: maclib370 alone, verbose + debug
+        run: HOMEBREW_DEBUG=1 brew install --verbose --debug mvslovers/tap/maclib370 2>&1 | tee maclib.log; echo "pipestatus=${PIPESTATUS[0]}"
+      - name: cc370 (pulls libc370), verbose
+        if: always()
+        run: HOMEBREW_DEBUG=1 brew install --verbose mvslovers/tap/cc370 2>&1 | tee cc370.log; echo "pipestatus=${PIPESTATUS[0]}"
+      - name: maclib370 reinstall without tee (as homebrew-check runs it)
+        if: always()
+        run: brew uninstall --ignore-dependencies maclib370 || true; brew install mvslovers/tap/maclib370
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: logs-${{ matrix.runner }}-${{ matrix.attempt }}
+          path: '*.log'
