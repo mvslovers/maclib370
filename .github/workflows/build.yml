@@ -4,10 +4,9 @@
 #   verify   tools/extract.py --verify: every member against MANIFEST.tsv
 #   package  tools/package.py (fails on a name both libraries carry, compared
 #            without case), tools/checkpkg.sh, the Homebrew formula renders,
-#            and tools/smoke.sh with the latest released as370
-#
-# The smoke assembly passes -I for now: no cc370 release searches
-# <exedir>/../maclib370/macros yet (cc370 4d1fca9). TODO.md has the switch.
+#            and tools/smoke.sh with the latest released as370: no -I through
+#            the maclib370 slot (cc370 1.6.0 on), a control without it, and
+#            -I (#6)
 
 name: Build
 

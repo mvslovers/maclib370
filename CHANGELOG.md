@@ -6,6 +6,13 @@ to the tooling alone is a patch.
 
 ## [Unreleased]
 
+### Changed
+- `tools/smoke.sh` assembles the smoke test with no `-I`, through the
+  directory an `as370` from cc370 1.6.0 on searches by itself
+  (`<exedir>/../maclib370/macros`), in a throwaway copy of the toolchain
+  tree; a copy without maclib370 is the control, and the `-I` case stays and
+  must give the same object (#6).
+
 ## [1.0.0] - 2026-10-11
 
 ### Added
