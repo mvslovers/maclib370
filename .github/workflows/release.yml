@@ -1,0 +1,131 @@
+# Publish a GitHub release for a v* tag (#3).
+#
+# 1. build.yml with the tag's version: the tag has to verify, package, pass
+#    tools/checkpkg.sh and the smoke assembly.
+# 2. VERSION has to equal the tag without its "v" and without a prerelease
+#    suffix (v1.0.0-rc1 sits on VERSION 1.0.0); a mismatch means the tag
+#    sits on the wrong commit.
+# 3. The notes are the tag's CHANGELOG.md section (tools/changelog-section.py);
+#    a prerelease takes the section of its version (1.0.0-rc1: [1.0.0]);
+#    a tag without a section fails here.  A tag with a "-" (1.1.0-rc1) is a
+#    prerelease.  A release that already exists is re-uploaded only when it
+#    is a prerelease, and keeps its notes; a published release is never
+#    replaced -- that would move a released version.
+# 4. The Homebrew formula: homebrew/maclib370.rb.in rendered with the version
+#    and the tarball's sha256 from the release's own SHA256SUMS, pushed to
+#    mvslovers/homebrew-tap.  Only a v* tag reaches the `release` environment
+#    that holds the tap's deploy key (HOMEBREW_TAP_DEPLOY_KEY).  An unchanged
+#    formula is not committed, and a prerelease never reaches the tap.
+
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - name: The tag's version
+        id: v
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: version
+    uses: ./.github/workflows/build.yml
+    with:
+      version: ${{ needs.version.outputs.version }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: VERSION matches the tag
+        run: |
+          want="${GITHUB_REF_NAME#v}"
+          want="${want%%-*}"
+          have="$(cat VERSION)"
+          if [ "$have" != "$want" ]; then
+            echo "::error::VERSION is '$have', the tag says '$want'"
+            exit 1
+          fi
+
+      - name: The artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: maclib370-dist
+          path: dist
+
+      - name: Release notes
+        run: |
+          (cd dist && sha256sum -c SHA256SUMS)
+          v="${GITHUB_REF_NAME#v}"
+          python3 tools/changelog-section.py "${v%%-*}" > notes.md
+
+      - name: Create the release, attach the artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if pre=$(gh release view "$GITHUB_REF_NAME" --json isPrerelease \
+                     -q .isPrerelease 2>/dev/null); then
+            if [ "$pre" != true ]; then
+              echo "::error::$GITHUB_REF_NAME is released; its assets are not replaced"
+              exit 1
+            fi
+            echo "Prerelease $GITHUB_REF_NAME exists; its notes are left as they are."
+          else
+            case $GITHUB_REF_NAME in *-*) p=--prerelease ;; *) p= ;; esac
+            gh release create "$GITHUB_REF_NAME" $p \
+              --title "maclib370 $GITHUB_REF_NAME" --notes-file notes.md
+          fi
+          gh release upload "$GITHUB_REF_NAME" --clobber dist/*
+
+  homebrew:
+    needs: [version, release]
+    if: ${{ !contains(github.ref_name, '-') }}
+    runs-on: ubuntu-latest
+    environment: release
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Render Formula/maclib370.rb
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "$GITHUB_REF_NAME" -p SHA256SUMS -O sums
+          v="${{ needs.version.outputs.version }}"
+          s=$(grep "  maclib370-$v.tar.gz\$" sums | cut -d' ' -f1)
+          [ -n "$s" ] || { echo "::error::tarball not in SHA256SUMS"; exit 1; }
+          sed -e "s/@VERSION@/$v/g" -e "s/@SHA256@/$s/" \
+            homebrew/maclib370.rb.in > maclib370.rb
+          ! grep -n '@[A-Z0-9]*@' maclib370.rb
+          ruby -c maclib370.rb
+
+      - name: Push it to mvslovers/homebrew-tap
+        env:
+          TAP_KEY: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$TAP_KEY" > ~/.ssh/tap && chmod 600 ~/.ssh/tap
+          ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/tap -o IdentitiesOnly=yes"
+          git clone -q git@github.com:mvslovers/homebrew-tap.git tap
+          cp maclib370.rb tap/Formula/maclib370.rb
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/maclib370.rb
+          v="${{ needs.version.outputs.version }}"
+          if git diff --cached --quiet; then echo "already at $v"
+          else git commit -qm "maclib370 $v" && git push -q origin HEAD:main; fi
+          rm -f ~/.ssh/tap

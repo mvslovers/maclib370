@@ -1,0 +1,102 @@
+# Build and check the packages on every PR and push to main (#3); release.yml
+# calls it with the tag's version.
+#
+#   verify   tools/extract.py --verify: every member against MANIFEST.tsv
+#   package  tools/package.py (fails on a name both libraries carry, compared
+#            without case), tools/checkpkg.sh, the Homebrew formula renders,
+#            and tools/smoke.sh with the latest released as370
+#
+# The smoke assembly passes -I for now: no cc370 release searches
+# <exedir>/../maclib370/macros yet (cc370 4d1fca9). TODO.md has the switch.
+
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        default: ""
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Every member against MANIFEST.tsv
+        run: python3 tools/extract.py --verify
+
+  package:
+    needs: verify
+    runs-on: ubuntu-latest
+    env:
+      NFPM_VERSION: 2.47.0
+      NFPM_SHA256: 0660ca602b2d2d2ae4781a06c692b3eeb9d437ffea05b831d76e41f4a3188783
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: nFPM (pinned) and rpm
+        run: |
+          f=nfpm_${NFPM_VERSION}_Linux_x86_64.tar.gz
+          curl -sSfLO "https://github.com/goreleaser/nfpm/releases/download/v${NFPM_VERSION}/$f"
+          echo "${NFPM_SHA256}  $f" | sha256sum -c -
+          mkdir -p "$HOME/nfpm" && tar xzf "$f" -C "$HOME/nfpm" nfpm
+          echo "$HOME/nfpm" >> "$GITHUB_PATH"
+          sudo apt-get update && sudo apt-get install -y rpm
+
+      - name: Package
+        id: pkg
+        run: |
+          v="${{ inputs.version }}"
+          [ -n "$v" ] || v="$(cat VERSION)+g$(git rev-parse --short HEAD)"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          python3 tools/package.py build --version "$v"
+
+      - name: Check the packages
+        run: sh tools/checkpkg.sh dist "${{ steps.pkg.outputs.version }}"
+
+      - name: The Homebrew formula renders
+        run: |
+          v="${{ steps.pkg.outputs.version }}"
+          s=$(grep "  maclib370-$v.tar.gz\$" dist/SHA256SUMS | cut -d' ' -f1)
+          sed -e "s/@VERSION@/$v/g" -e "s/@SHA256@/$s/" \
+            homebrew/maclib370.rb.in > maclib370.rb
+          ! grep -n '@[A-Z0-9]*@' maclib370.rb
+          grep -q "sha256 \"$s\"" maclib370.rb
+          ruby -c maclib370.rb
+
+      - name: as370, the latest cc370 release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          v=$(gh release view -R mvslovers/cc370 --json tagName -q .tagName)
+          gh release download "$v" -R mvslovers/cc370 -D cc \
+            -p "cc370-${v#v}-linux-amd64.tar.gz" -p SHA256SUMS
+          (cd cc && sha256sum -c --ignore-missing SHA256SUMS)
+          tar xzf "cc/cc370-${v#v}-linux-amd64.tar.gz" -C cc
+          echo "AS370=$PWD/cc/cc370-${v#v}-linux-amd64/cc370/bin/as370" >> "$GITHUB_ENV"
+          echo "cc370 $v" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Smoke assembly against the unpacked tarball
+        run: |
+          mkdir -p unpacked
+          tar xzf "dist/maclib370-${{ steps.pkg.outputs.version }}.tar.gz" -C unpacked
+          sh tools/smoke.sh "$AS370" unpacked/macros
+
+      - name: Keep the packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: maclib370-dist
+          path: |
+            dist/*.tar.gz
+            dist/*.deb
+            dist/*.rpm
+            dist/*.json
+            dist/SHA256SUMS
+          if-no-files-found: error
