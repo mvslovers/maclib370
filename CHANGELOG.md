@@ -6,7 +6,7 @@ to the tooling alone is a patch.
 
 ## [Unreleased]
 
-## [1.0.0] - unreleased
+## [1.0.0] - 2026-10-11
 
 ### Added
 - `SYS1.MACLIB` (747 members) and `SYS1.AMODGEN` (288 members) of MVS 3.8j at
