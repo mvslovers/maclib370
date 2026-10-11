@@ -2,9 +2,11 @@
 #
 # 1. build.yml with the tag's version: the tag has to verify, package, pass
 #    tools/checkpkg.sh and the smoke assembly.
-# 2. VERSION has to equal the tag without its "v"; a mismatch means the tag
+# 2. VERSION has to equal the tag without its "v" and without a prerelease
+#    suffix (v1.0.0-rc1 sits on VERSION 1.0.0); a mismatch means the tag
 #    sits on the wrong commit.
 # 3. The notes are the tag's CHANGELOG.md section (tools/changelog-section.py);
+#    a prerelease takes the section of its version (1.0.0-rc1: [1.0.0]);
 #    a tag without a section fails here.  A tag with a "-" (1.1.0-rc1) is a
 #    prerelease.  A release that already exists is re-uploaded only when it
 #    is a prerelease, and keeps its notes; a published release is never
@@ -50,6 +52,7 @@ jobs:
       - name: VERSION matches the tag
         run: |
           want="${GITHUB_REF_NAME#v}"
+          want="${want%%-*}"
           have="$(cat VERSION)"
           if [ "$have" != "$want" ]; then
             echo "::error::VERSION is '$have', the tag says '$want'"
@@ -65,7 +68,8 @@ jobs:
       - name: Release notes
         run: |
           (cd dist && sha256sum -c SHA256SUMS)
-          python3 tools/changelog-section.py "${GITHUB_REF_NAME#v}" > notes.md
+          v="${GITHUB_REF_NAME#v}"
+          python3 tools/changelog-section.py "${v%%-*}" > notes.md
 
       - name: Create the release, attach the artifacts
         env:
