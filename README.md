@@ -82,6 +82,13 @@ checked, and the manifest says so.
 
 ## The IBM material
 
-The members are IBM's MVS 3.8j macros as distributed with TK5, plus the
-modifications listed above. This repository records where they came from; it
-makes no statement about them beyond that.
+**`maclib/` and `amodgen/` are IBM material**: IBM's MVS 3.8j macros as
+distributed with TK5, plus the modifications listed above. This repository
+records where they came from; it makes no statement about them beyond that.
+The license below does not apply to them.
+
+## License
+
+Everything else in this repository -- `tools/`, `MANIFEST.tsv`, this README
+and the build and packaging files -- is under the MIT License, see
+[LICENSE](LICENSE).
