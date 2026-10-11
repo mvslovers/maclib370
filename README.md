@@ -80,8 +80,10 @@ or if the two libraries share a name. `--unloaded DIR` reuses an earlier
 `dasdpdsu` run on a host without Hercules; the volume sums are then not
 checked, and the manifest says so.
 
-## The IBM material
+## Origin and licenses
 
-The members are IBM's MVS 3.8j macros as distributed with TK5, plus the
-modifications listed above. This repository records where they came from; it
-makes no statement about them beyond that.
+- `maclib/` and `amodgen/`: IBM's MVS 3.8j macros as distributed with TK5,
+  plus the modifications listed above. This repository records where they came
+  from; it makes no statement about them beyond that, and `LICENSE` does not
+  cover them.
+- Everything else (`tools/`, `MANIFEST.tsv`, this README): MIT, see `LICENSE`.
