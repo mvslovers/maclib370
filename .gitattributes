@@ -1,0 +1,4 @@
+# The macro files are 80-column records, LF, UTF-8, and MANIFEST.tsv carries
+# their SHA-256: no line-ending conversion, ever.
+*.macro -text diff
+MANIFEST.tsv -text diff

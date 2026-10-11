@@ -1,0 +1,144 @@
+         MACRO                                                          00003400
+&NAME    GTTERM &PRMSZE=,&ALTSZE=,&ATTRIB=,&TERMID=,&MF=I      @G76XRYU 00003500
+.*                                                             @OW03892 00003600
+.* A000000-999999                                              @G76XR00 00003700
+.* A034000                                                     @OZ90350 00003800
+.* NOCHANGE SHIPPED WITH JCLIN                                 @OY20024 00003900
+.* NOCHANGE SHIPPED WITH JCLIN                                 @OY26821 00004000
+.* ADDED TERMID PARAMETER                                      @OW03892 00004100
+.*                                                                      00004200
+         LCLC  &NDX                                            @G76XRYU 00004300
+&NDX     SETC  '&SYSNDX'                                       @G76XRYU 00004400
+         AIF   ('&MF' EQ 'I' AND '&PRMSZE' EQ '' AND '&ATTRIB' EQ '' AN-00004500
+               D '&TERMID' EQ '').ERROR1              @G76XRYU @OW03892 00004600
+         AIF   ('&MF' EQ 'L').LFORM                                     00004700
+         AIF   ('&MF(1)' EQ 'E').EFORM                                  00004800
+         AIF   ('&MF' NE 'I').ERROR2                                    00004900
+.*********************I -FORM OF MACRO********************************* 00005000
+&NAME    CNOP  0,4                                                      00005100
+         BAL   1,*+20                   BRANCH AROUND PARMS    @G76XRYU 00005200
+.*                                                             @OW03892 00005300
+GTRM&NDX DC    A(0)                     ADDRESS OF PRIMARY     @G76XRYU 00005400
+         DC    A(0)                     ADDRESS OF ALTERNATE            00005500
+         DC    A(0)                     ADDRESS OF ATTRIBUTE   @G76XRYU 00005600
+         DC    A(0)                     ADDRESS OF TERMINAL ID @OW03892 00005700
+         AGO   .STADDR                                                  00005800
+.EFORM   ANOP                                                           00005900
+&NAME    CNOP  0,4                                             @OZ90350 00006000
+         IHBOPLST ,,&NAME,MF=&MF                                        00006100
+.STADDR  ANOP                                                           00006200
+.*********COMMON CODE FOR BOTH I AND E FORM OF MACRO******************  00006300
+         AIF   ('&PRMSZE' EQ '').LABEL2                                 00006400
+         AIF   ('&PRMSZE'(1,1) NE '(').LOADPRM                          00006500
+         ST    &PRMSZE(1),0(,1)         STORE PRIMARY ADDRESS           00006600
+         AGO   .LABEL2                                                  00006700
+.LOADPRM ANOP                                                           00006800
+         AIF   ('&PRMSZE'(K'&PRMSZE,1) EQ ')' OR '&MF' NE 'I').LPARM    00006900
+         ORG   GTRM&NDX                 PUT ADDR OF PRIMARY    @G76XRYU 00007000
+         DC    A(&PRMSZE)               IN PARM LIST           @G76XRYU 00007100
+         ORG                                                            00007200
+         AGO   .LABEL2                                         @G76XRYU 00007300
+.LPARM   ANOP                      ..LA ADDR OR EXECUTE FORM   @G76XRYU 00007400
+         LA    0,&PRMSZE                LOAD ADDRESS OF PRIMARY         00007500
+         ST    0,0(,1)                  STORE ADDRESS OF PRIMARY        00007600
+.LABEL2  ANOP                                                           00007700
+         AIF   ('&ALTSZE' EQ '').IEATRCK                       @G76XRYU 00007800
+         AIF   ('&ALTSZE'(1,1) NE '(').LOADALT                          00007900
+         ST    &ALTSZE(1),4(,1)         STORE ADDRESS OF ALTERNATE      00008000
+         AGO   .IEATRCK                                        @G76XRYU 00008100
+.LOADALT ANOP                                                           00008200
+         AIF   ('&ALTSZE'(K'&ALTSZE,1) EQ ')' OR '&MF' NE 'I').LAALT    00008300
+         ORG   GTRM&NDX+4               PUT ALTERNATE SIZE     @G76XRYU 00008400
+         DC    A(&ALTSZE)               IN PARM LIST           @G76XRYU 00008500
+         ORG                                                            00008600
+         AGO   .IEATRCK                                        @G76XRYU 00008700
+.LAALT   ANOP                     ...LA ADDR OR EXECUTE FORM   @G76XRYU 00008800
+         LA    0,&ALTSZE                LOAD ADDR OF ALTERNATE @G76XRYU 00008900
+         ST    0,4(,1)                  STORE ADD OF ALTERNATE @G76XRYU 00009000
+.*  PROCESS ATTRIBUTE PARM FOR I AND E FORMS WHEN NOT NULL     @G76XRYU 00009100
+.IEATRCK ANOP                                                  @G76XRYU 00009200
+         AIF   ('&ATTRIB' EQ '').LABEL3               @G76XRYU @OW03892 00009300
+         AIF   ('&ATTRIB'(1,1) EQ '(').REGATR                  @G76XRYU 00009400
+         AIF   ('&ATTRIB'(K'&ATTRIB,1) EQ ')' OR '&MF' NE 'I').LAATRIB  00009500
+         ORG   GTRM&NDX+8               PUT ATTRIB BYTE ADDR   @G76XRYU 00009600
+         DC    A(&ATTRIB)               IN PARM LIST           @G76XRYU 00009700
+         ORG                                                            00009800
+         AGO   .LABEL3                                @G76XRYU @OW03892 00009900
+.LAATRIB ANOP                       .. LA ADDR OR EXECUTE FORM @G76XRYU 00010000
+         LA    0,&ATTRIB                GET ADR OF ATTRIB BYTE @G76XRYU 00010100
+         ST    0,8(1)                   PUT IN 3RD PARM WORD   @G76XRYU 00010200
+         AGO   .LABEL3                                @G76XRYU @OW03892 00010300
+.REGATR  ANOP                                                  @G76XRYU 00010400
+         ST    &ATTRIB(1),8(1)          REG => 3RD PARM WORD   @G76XRYU 00010500
+.*  PROCESS TERMINAL ID PARM FOR I AND E FORMS WHEN NOT NULL   @OW03892 00010600
+.LABEL3  ANOP                                                  @OW03892 00010700
+         AIF   ('&TERMID' EQ '').SVCENTY                       @OW03892 00010800
+         AIF   ('&TERMID'(1,1) NE '(').LOTRMID                 @OW03892 00010900
+         ST    &TERMID(1),12(,1)        STORE PRIMARY ADDRESS  @OW03892 00011000
+         OI    12(1),128                END OF LIST INDICATOR  @OW03892 00011100
+         AGO   .SVCENT2                                        @OW03892 00011200
+.LOTRMID ANOP                                                  @OW03892 00011300
+         AIF   ('&TERMID'(K'&TERMID,1) EQ ')' OR '&MF' NE 'I').LTERM    00011400
+.*                                                             @OW03892 00011500
+         ORG   GTRM&NDX+12              PUT ADDR OF TERMID IN  @OW03892 00011600
+         DC    XL1'80',AL3(&TERMID)     PARM LIST WITH END OF  @OW03892 00011700
+.*                                      LIST INDICATOR         @OW03892 00011800
+         ORG                                                            00011900
+         AGO   .SVCENT2                                        @OW03892 00012000
+.LTERM   ANOP                      ..LA ADDR OR EXECUTE FORM   @OW03892 00012100
+         LA    0,&TERMID                LOAD ADDRESS OF TERMINAL ID     00012200
+.*                                                             @OW03892 00012300
+         ST    0,12(,1)                 STORE ADDRESS OF TERMINAL ID    00012400
+.*                                                             @OW03892 00012500
+         OI    12(1),128                END OF LIST INDICATOR  @OW03892 00012600
+         AGO   .SVCENT2                                        @OW03892 00012700
+.SVCENTY ANOP                                                           00012800
+         OI    8(1),128                 END OF LIST INDICATOR  @G76XRYU 00012900
+.SVCENT2 ANOP                                                           00013000
+         LA    0,17                     ENTRY CODE                      00013100
+         SLL   0,24                     SHIFT TO HIGH ORDER BYTE        00013200
+         SVC   94                       ISSUE SVC                       00013300
+         MEXIT                                                          00013400
+.***************  L  - FORM  ***************************                00013500
+.LFORM   ANOP                                                           00013600
+&NAME    DS    0F                                                       00013700
+         AIF   ('&PRMSZE' EQ '').NOPRMAD                                00013800
+         AIF   ('&PRMSZE'(1,1) EQ '(').NOPRMAD                          00013900
+         DC    A(&PRMSZE)               ADDRESS OF PRIMARY PARM ADDR    00014000
+         AGO   .CHKALT                                                  00014100
+.NOPRMAD ANOP                                                           00014200
+         DC    A(0)                     ADDRESS OF PRIMARY PARM ADDR    00014300
+.CHKALT  AIF   ('&ALTSZE' EQ '').NOALTAD                                00014400
+         AIF   ('&ALTSZE'(1,1) EQ '(').NOALTAD                          00014500
+         DC    A(&ALTSZE)               ADDRESS OF ALTERNATE ADDR       00014600
+         AGO   .LATTCK                                         @G76XRYU 00014700
+.NOALTAD ANOP                                                           00014800
+         DC    A(0)                     ADDR OF ALTERNATE      @G76XRYU 00014900
+.*  PROCESS ATTRIBUTE PARM FOR LIST FORM                       @G76XRYU 00015000
+.LATTCK  ANOP                                                  @G76XRYU 00015100
+         AIF   ('&ATTRIB' NE '').CKATTR                        @G76XRYU 00015200
+         DC    A(0)                     L-FORM--ATTRIB BYTE    @G76XRYU 00015300
+         AGO   .CKTERM                                @G76XRYU @OW03892 00015400
+.CKATTR  ANOP                                                  @G76XRYU 00015500
+         AIF   ('&ATTRIB'(1,1) NE '(').ATTROK                  @G76XRYU 00015600
+         MNOTE 12,'IHB300 INCOMPATIBLE OPERANDS: MF=L AND ATTRIB=&ATTRI*00015700
+               B'                                              @G76XRYU 00015800
+         AGO   .CKTERM                                @G76XRYU @OW03892 00015900
+.ATTROK  ANOP                                                  @G76XRYU 00016000
+         DC    A(&ATTRIB)               L-FORM--A(ATTR BYTE)   @G76XRYU 00016100
+         AGO   .CKTERM                                         @OW03892 00016200
+.CKTERM  AIF   ('&TERMID' EQ '').NOTRMAD                       @OW03892 00016300
+         AIF   ('&TERMID'(1,1) EQ '(').NOTRMAD                 @OW03892 00016400
+         DC    A(&TERMID)               ADDRESS OF TERMINAL ID ADDR     00016500
+.*                                                             @OW03892 00016600
+         MEXIT                                                 @OW03892 00016700
+.NOTRMAD ANOP                                                  @OW03892 00016800
+         DC    A(0)                     ADDRESS OF TERMINAL ID ADDR     00016900
+.*                                                             @OW03892 00017000
+         MEXIT                                                 @OW03892 00017100
+.ERROR1  ANOP                                                           00017200
+         IHBERMAC 1006,PRMSZE                                           00017300
+         MEXIT                                                          00017400
+.ERROR2  IHBERMAC 54,,&MF                                               00017500
+         MEXIT                                                          00017600
+         MEND                                                           00017700
